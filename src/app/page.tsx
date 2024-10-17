@@ -13,10 +13,11 @@ export default function ReceiptUploader() {
   const [priceWithGST, setPriceWithGST] = useState('');
   const [date, setDate] = useState('');
   const [purpose, setPurpose] = useState('Work');
+  const [person, setPerson] = useState('Harsha');
   const [receipts, setReceipts] = useState<any[]>([]);
   const [statusMessage, setStatusMessage] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const receiptsPerPage = 5;
+  const receiptsPerPage = 10;
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,6 +31,8 @@ export default function ReceiptUploader() {
     const fetchReceipts = async () => {
       try {
         const response = await axios.get('https://upload-backend-wsmc.onrender.com/api/receipts');
+        // const response = await axios.get('http://localhost:3001/api/receipts');
+        
         const sortedReceipts = response.data.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setReceipts(sortedReceipts);
       } catch (error) {
@@ -44,12 +47,23 @@ export default function ReceiptUploader() {
     setIsCameraOpen(true);
     setStatusMessage('');
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } } // Use the back camera
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
       }
     }
+  };
+
+  const closeCamera = () => {
+    if (videoRef.current) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      tracks.forEach(track => track.stop()); // Stop all tracks (camera feed)
+    }
+    setIsCameraOpen(false); // Close the camera modal
   };
 
   const captureImage = () => {
@@ -60,7 +74,14 @@ export default function ReceiptUploader() {
       context?.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
       const dataUrl = canvasRef.current.toDataURL('image/jpeg');
       setCapturedImage(dataUrl); // Set base64-encoded image
+      setSelectedFile(null);
+      // Stop the video stream after capturing the image
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      tracks.forEach(track => track.stop()); // Stop all tracks (camera feed)
+  
       setIsCameraOpen(false); // Close camera after capturing image
+      
     }
   };
 
@@ -72,22 +93,41 @@ export default function ReceiptUploader() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    // if (!selectedFile) return;
 
     const formData = new FormData();
-    formData.append('receipt', selectedFile);
+    if (selectedFile) {
+      formData.append('receipt', selectedFile);
+    } else if (capturedImage) {
+      formData.append('base64Image', capturedImage);
+    } else {
+      setStatusMessage('No image selected or captured.');
+      return;
+    }
     formData.append('description', description);
     formData.append('store', store);
     formData.append('priceWithGST', priceWithGST);
     formData.append('date', date);
     formData.append('purpose', purpose);
+    formData.append('person', person);
 
     try {
       const response = await axios.post('https://upload-backend-wsmc.onrender.com/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      // const response = await axios.post('http://localhost:3001/api/upload', formData, {
+      //   headers: { 'Content-Type': 'multipart/form-data' },
+      // });
       setReceipts((prevReceipts) => [...prevReceipts, response.data]);
       setStatusMessage('Upload successful!');
+      setCapturedImage(null);
+      setSelectedFile(null);
+      setDescription('');
+      setStore('')
+      setPriceWithGST('')
+      setDate('')
+      setPurpose('Work')
+      setPerson('Harsha')
     } catch (error) {
       console.error('Error uploading and saving data:', error);
       setStatusMessage('Failed to upload receipt. Please try again.');
@@ -109,6 +149,7 @@ export default function ReceiptUploader() {
         { header: 'Price with GST', key: 'priceWithGST', width: 20 },
         { header: 'Date', key: 'date', width: 15 },
         { header: 'Purpose', key: 'purpose', width: 15 },
+        { header: 'Person', key: 'person', width: 15 },
         { header: 'Image URL', key: 'imageURL', width: 40 },
       ];
 
@@ -119,6 +160,7 @@ export default function ReceiptUploader() {
           priceWithGST: receipt.priceWithGST,
           date: new Date(receipt.date).toLocaleDateString(),
           purpose: receipt.purpose,
+          person: receipt.person,
           imageURL: receipt.imageURL,
         });
       });
@@ -177,6 +219,17 @@ export default function ReceiptUploader() {
         </div>
       )}
 
+      {isCameraOpen && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h2>Capture Image</h2>
+            <video ref={videoRef} autoPlay style={styles.video} />
+            <button onClick={captureImage} style={styles.button}>Capture</button>
+            <button onClick={closeCamera} style={styles.button}>Close Camera</button>
+          </div>
+        </div>
+      )}
+
       {capturedImage && <img src={capturedImage} alt="Captured" style={styles.capturedImage} />}
 
       <div style={styles.inputGroup}>
@@ -228,20 +281,18 @@ export default function ReceiptUploader() {
         </select>
       </div>
 
+      <div style={styles.inputGroup}>
+        <label style={styles.label}>Person:</label>
+        <select value={person} onChange={(e) => setPerson(e.target.value)} style={styles.select}>
+          <option value="Harsha">Harsha</option>
+          <option value="Hesh">Hesh</option>
+        </select>
+      </div>
+
+
       <button onClick={handleUpload} style={styles.button}>
         Upload and Save
       </button>
-
-      {isCameraOpen && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <h2>Capture Image</h2>
-            <video ref={videoRef} autoPlay style={styles.video} />
-            <button onClick={captureImage} style={styles.button}>Capture</button>
-            <button onClick={() => setIsCameraOpen(false)} style={styles.button}>Close Camera</button>
-          </div>
-        </div>
-      )}
 
       {statusMessage && (
         <p style={statusMessage.includes('successful') ? styles.successMessage : styles.errorMessage}>
@@ -294,16 +345,24 @@ export default function ReceiptUploader() {
 
       {/* Modal for showing receipt details */}
       {isModalOpen && selectedReceipt && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <h2>Receipt Details</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+            <h2 className="text-xl font-bold mb-4">Receipt Details</h2>
             <p><strong>Description:</strong> {selectedReceipt.description}</p>
             <p><strong>Store:</strong> {selectedReceipt.store}</p>
-            <p><strong>Price with GST:</strong> {selectedReceipt.priceWithGST}</p>
-            <p><strong>Date:</strong> {new Date(selectedReceipt.date).toLocaleDateString()}</p>
+            <p><strong>Price:</strong> {selectedReceipt.price}</p>
+            <p><strong>Date:</strong> {selectedReceipt.date}</p>
             <p><strong>Purpose:</strong> {selectedReceipt.purpose}</p>
+            <p><strong>Person:</strong> {selectedReceipt.person}</p>
+            
             <img src={selectedReceipt.imageURL} alt="Receipt" style={styles.receiptImage} />
-            <button onClick={closeModal} style={styles.button}>Close</button>
+
+            <button
+              onClick={closeModal}
+              className="btn-primary mt-4 w-full"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
@@ -366,6 +425,14 @@ const styles: { [key: string]: CSSProperties } = {
   exportButton: {
     padding: '10px 20px',
     backgroundColor: '#333',     // Dark grey/black export button
+    color: '#fff',               // White text on the export button
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  cameraButton: {
+    padding: '10px 20px',
+    backgroundColor: 'gray',     // Dark grey/black export button
     color: '#fff',               // White text on the export button
     border: 'none',
     borderRadius: '5px',

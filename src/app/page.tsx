@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { CSSProperties } from 'react';
 import ExcelJS from 'exceljs';
+import { useRouter } from 'next/navigation';
 
 export default function ReceiptUploader() {
+  const router = useRouter();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null); // To store the captured image data
   const [description, setDescription] = useState('');
@@ -304,68 +306,11 @@ export default function ReceiptUploader() {
         Export to Excel
       </button>
 
-      <h2 style={styles.subheading}>Saved Receipts</h2>
+      <button onClick={() => router.push('/receipts')} style={styles.viewReceiptsButton}>
+        View Receipts
+      </button>
 
-      <div style={styles.tableContainer}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Price with GST</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {currentReceipts.map((receipt) => (
-              <tr key={receipt._id}>
-                <td>{receipt.description}</td>
-                <td>{receipt.priceWithGST}</td>
-                <td>
-                  <button onClick={() => openModal(receipt)} style={styles.detailsButton}>
-                    More Details
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={styles.pagination}>
-        {Array.from({ length: totalPages }, (_, index) => (
-          <button
-            key={index}
-            onClick={() => handlePageChange(index + 1)}
-            style={styles.pageButton}
-          >
-            {index + 1}
-          </button>
-        ))}
-      </div>
-
-      {/* Modal for showing receipt details */}
-      {isModalOpen && selectedReceipt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
-            <h2 className="text-xl font-bold mb-4">Receipt Details</h2>
-            <p><strong>Description:</strong> {selectedReceipt.description}</p>
-            <p><strong>Store:</strong> {selectedReceipt.store}</p>
-            <p><strong>Price:</strong> {selectedReceipt.price}</p>
-            <p><strong>Date:</strong> {selectedReceipt.date}</p>
-            <p><strong>Purpose:</strong> {selectedReceipt.purpose}</p>
-            <p><strong>Person:</strong> {selectedReceipt.person}</p>
-            
-            <img src={selectedReceipt.imageURL} alt="Receipt" style={styles.receiptImage} />
-
-            <button
-              onClick={closeModal}
-              className="btn-primary mt-4 w-full"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 }
@@ -512,5 +457,14 @@ const styles: { [key: string]: CSSProperties } = {
   errorMessage: {
     color: '#ff0000',            // Red error message text
     marginTop: '10px',
+  },
+  viewReceiptsButton: {
+    padding: '10px 20px',
+    backgroundColor: '#28a745',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    marginTop: '20px',
   },
 };

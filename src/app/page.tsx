@@ -18,12 +18,8 @@ export default function ReceiptUploader() {
   const [person, setPerson] = useState('Harsha');
   const [receipts, setReceipts] = useState<any[]>([]);
   const [statusMessage, setStatusMessage] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const receiptsPerPage = 10;
 
   // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null); // Ref for video element
   const [isCameraOpen, setIsCameraOpen] = useState(false); // To control camera modal
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -182,25 +178,6 @@ export default function ReceiptUploader() {
     } catch (error) {
       console.error('Error exporting to Excel:', error);
     }
-  };
-
-  const indexOfLastReceipt = currentPage * receiptsPerPage;
-  const indexOfFirstReceipt = indexOfLastReceipt - receiptsPerPage;
-  const currentReceipts = receipts.slice(indexOfFirstReceipt, indexOfLastReceipt);
-  const totalPages = Math.ceil(receipts.length / receiptsPerPage);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const openModal = (receipt: any) => {
-    setSelectedReceipt(receipt);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedReceipt(null);
   };
 
   return (

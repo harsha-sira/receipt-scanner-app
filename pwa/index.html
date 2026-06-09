@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bill Capture">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Bill Capture</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #1a73e8;
+      --blue-dark: #1557b0;
+      --surface: #ffffff;
+      --bg: #f0f4f9;
+      --text: #202124;
+      --text-2: #5f6368;
+      --success: #137333;
+      --error: #c5221f;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+
+    /* ── App Shell ─────────────────────────────────────────── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+    }
+
+    header {
+      background: var(--blue);
+      color: #fff;
+      padding: calc(12px + var(--safe-top)) 20px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    header svg { flex-shrink: 0; }
+
+    /* ── Screens ───────────────────────────────────────────── */
+    .screen {
+      display: none;
+      flex: 1;
+      overflow: hidden;
+    }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ── Install Banner ────────────────────────────────────── */
+    #install-banner {
+      background: #e8f0fe;
+      border-bottom: 1px solid #c5d8fb;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #1a56c4;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #install-banner[hidden] { display: none; }
+    #install-banner strong { font-weight: 600; }
+
+    /* ── Auth Screen ───────────────────────────────────────── */
+    #screen-auth {
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+      padding: 40px 32px;
+      text-align: center;
+    }
+
+    .app-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--blue);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .app-icon svg { width: 48px; height: 48px; }
+
+    #screen-auth h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    #screen-auth p {
+      font-size: 15px;
+      color: var(--text-2);
+      line-height: 1.5;
+      max-width: 260px;
+    }
+
+    /* ── Buttons ───────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 28px;
+      border-radius: 100px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      min-height: 52px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--blue);
+      border: 2px solid var(--blue);
+    }
+
+    .btn-google {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid #dadce0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      width: 100%;
+      max-width: 300px;
+    }
+
+    /* ── Camera Screen ─────────────────────────────────────── */
+    #screen-camera {
+      background: #000;
+      position: relative;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding-bottom: calc(36px + var(--safe-bottom));
+      align-items: center;
+    }
+
+    /* Viewfinder guide corners */
+    .viewfinder-guide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      width: min(90vw, 340px);
+      height: min(60vw, 240px);
+      pointer-events: none;
+    }
+    .viewfinder-guide::before,
+    .viewfinder-guide::after,
+    .vf-br::before,
+    .vf-br::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: rgba(255,255,255,0.8);
+      border-style: solid;
+    }
+    .viewfinder-guide::before { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 3px 0 0 0; }
+    .viewfinder-guide::after  { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 3px 0 0; }
+    .vf-br::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 3px; }
+    .vf-br::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 3px 0; }
+
+    #capture-btn {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.95);
+      border: 4px solid #fff;
+      outline: 3px solid rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.15s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    #capture-btn:active { transform: scale(0.92); }
+
+    /* ── Preview Screen ────────────────────────────────────── */
+    #screen-preview {
+      background: #000;
+    }
+
+    #screen-preview .preview-wrap {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #preview {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .preview-actions {
+      background: #111;
+      padding: 20px 24px calc(20px + var(--safe-bottom));
+      display: flex;
+      gap: 12px;
+    }
+
+    .preview-actions .btn { flex: 1; }
+
+    /* ── Uploading Screen ──────────────────────────────────── */
+    #screen-uploading {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .spinner {
+      width: 52px;
+      height: 52px;
+      border: 4px solid #e0e0e0;
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #screen-uploading p {
+      font-size: 16px;
+      color: var(--text-2);
+    }
+
+    /* ── Success Screen ────────────────────────────────────── */
+    #screen-success {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      padding: 40px 32px calc(40px + var(--safe-bottom));
+      text-align: center;
+    }
+
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--success);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .success-icon svg { width: 44px; height: 44px; }
+
+    #screen-success h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--success);
+    }
+
+    #screen-success p {
+      font-size: 14px;
+      color: var(--text-2);
+    }
+
+    #success-link {
+      display: inline-block;
+      font-size: 14px;
+      color: var(--blue);
+      text-decoration: none;
+      margin-top: -8px;
+    }
+    #success-link:hover { text-decoration: underline; }
+
+    .success-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    /* ── Status Toast ──────────────────────────────────────── */
+    #status {
+      position: fixed;
+      bottom: calc(24px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      background: #323232;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: calc(100vw - 32px);
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 100;
+      animation: fadeIn 0.2s ease;
+    }
+    #status.error  { background: var(--error); }
+    #status.success { background: var(--success); }
+    #status[hidden] { display: none; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
+
+    /* ── Folder Chips ──────────────────────────────────────── */
+    .folder-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 0 16px;
+    }
+
+    .chip {
+      padding: 8px 18px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 2px solid rgba(255,255,255,0.55);
+      background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      min-height: 38px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    }
+    .chip.active {
+      background: #fff;
+      border-color: #fff;
+      color: var(--blue);
+    }
+    .chip:active { transform: scale(0.94); }
+
+    /* chips on preview screen sit on a dark bar, not over video */
+    .preview-chips-wrap {
+      background: #111;
+      padding: 14px 20px 4px;
+    }
+
+    /* ── Misc ──────────────────────────────────────────────── */
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <svg viewBox="0 0 24 24" fill="none" width="24" height="24">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="14 2 14 8 20 8" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="8" y1="17" x2="13" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <h1>Bill Capture</h1>
+  </header>
+
+  <!-- iOS install hint (shown only in browser, not standalone) -->
+  <div id="install-banner" hidden>
+    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a1 1 0 011 1v7.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 10.586V3a1 1 0 011-1z"/><path d="M3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+    Tap <strong>Share</strong> → <strong>Add to Home Screen</strong> to install
+  </div>
+
+  <!-- Auth -->
+  <section id="screen-auth" class="screen active">
+    <div class="app-icon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="14 2 14 8 20 8" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <line x1="8" y1="17" x2="13" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h2>Bill Capture</h2>
+    <p>Photo your bills and upload straight to Google Drive — no camera roll needed.</p>
+    <button class="btn btn-google" id="sign-in-btn" onclick="signIn()">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
+  </section>
+
+  <!-- Camera -->
+  <section id="screen-camera" class="screen">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="camera-overlay">
+      <div class="viewfinder-guide"><div class="vf-br"></div></div>
+      <!-- Folder chips — populated by renderFolderChips() -->
+      <div class="folder-chips" style="margin-bottom:18px;"></div>
+      <button id="capture-btn" onclick="capturePhoto()" aria-label="Capture photo"></button>
+    </div>
+  </section>
+
+  <!-- Preview -->
+  <section id="screen-preview" class="screen">
+    <div class="preview-wrap">
+      <img id="preview" alt="Captured bill">
+    </div>
+    <!-- Folder chips shown again so user can change destination before uploading -->
+    <div class="preview-chips-wrap">
+      <div class="folder-chips"></div>
+    </div>
+    <div class="preview-actions">
+      <button class="btn btn-secondary" onclick="retake()">Retake</button>
+      <button class="btn btn-primary" onclick="uploadToDrive()">Upload to Drive</button>
+    </div>
+  </section>
+
+  <!-- Uploading -->
+  <section id="screen-uploading" class="screen">
+    <div class="spinner"></div>
+    <p>Uploading to Google Drive…</p>
+  </section>
+
+  <!-- Success -->
+  <section id="screen-success" class="screen">
+    <div class="success-icon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h2>Uploaded!</h2>
+    <p id="success-filename"></p>
+    <p style="font-size:13px;color:var(--text-2);">→ <strong id="success-folder"></strong></p>
+    <a id="success-link" target="_blank" rel="noopener">View in Google Drive →</a>
+    <div class="success-actions">
+      <button class="btn btn-primary" onclick="captureAnother()">Capture Another</button>
+    </div>
+  </section>
+
+  <div id="status" hidden></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="onGISLoad()"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PWA credentials — copy config.example.js → config.js and fill in values
+pwa/config.js

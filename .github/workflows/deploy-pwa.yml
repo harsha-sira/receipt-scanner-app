@@ -3,7 +3,7 @@ name: Deploy PWA to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: [pwa/**]   # only redeploy when pwa/ files change
+    paths: [pwa/**]
 
 permissions:
   contents: read
@@ -29,7 +29,8 @@ jobs:
         run: |
           cat > pwa/config.js << 'EOF'
           window.BILL_CONFIG = {
-            CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID }}",
+            CLIENT_ID:  "${{ secrets.GOOGLE_CLIENT_ID }}",
+            WORKER_URL: "${{ secrets.WORKER_URL }}",
             FOLDERS: [
               { name: "Personal (Harsha)", id: "${{ secrets.FOLDER_ID_PERSONAL_HARSHA }}" },
               { name: "Personal Hesh",     id: "${{ secrets.FOLDER_ID_PERSONAL_HESH }}"   },

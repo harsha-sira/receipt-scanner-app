@@ -1,15 +1,13 @@
 'use strict';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-const CONFIG = window.BILL_CONFIG || { CLIENT_ID: '', FOLDERS: [] };
+const CONFIG = window.BILL_CONFIG || { CLIENT_ID: '', WORKER_URL: '', FOLDERS: [] };
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let tokenClient   = null;
-let accessToken   = null;
-let tokenExpiry   = 0;
-let videoStream   = null;
-let capturedBlob  = null;
-let pendingUpload = false;
+let accessToken  = null;
+let tokenExpiry  = 0;
+let videoStream  = null;
+let capturedBlob = null;
 
 let selectedFolderIdx = Math.min(
   parseInt(localStorage.getItem('lastFolder') || '0', 10),
@@ -32,54 +30,97 @@ if ('serviceWorker' in navigator) {
   if (isIOS && !isStandalone) $('install-banner').hidden = false;
 })();
 
-// ─── GIS initialisation ───────────────────────────────────────────────────────
-function onGISLoad() {
-  if (!CONFIG.CLIENT_ID || !CONFIG.FOLDERS?.length) {
-    showStatus('Copy config.example.js → config.js and fill in your credentials.', 'error');
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', initAuth);
+
+async function initAuth() {
+  if (!CONFIG.CLIENT_ID || !CONFIG.WORKER_URL || !CONFIG.FOLDERS?.length) {
+    showAuthUI('Copy config.example.js → config.js and fill in your credentials.');
     return;
   }
 
-  renderFolderChips();
+  // Handle return from Google OAuth — URL will have ?session=... or ?auth_error=...
+  const params      = new URLSearchParams(window.location.search);
+  const sessionParam = params.get('session');
+  const stateParam   = params.get('state');
+  const errorParam   = params.get('auth_error');
 
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CONFIG.CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: handleToken,
-    error_callback: () => {},
-  });
+  if (sessionParam || errorParam) {
+    history.replaceState({}, '', window.location.pathname); // clean up URL
+  }
 
-  tokenClient.requestAccessToken({ prompt: '' });
-}
+  if (errorParam) {
+    showAuthUI('Sign-in failed: ' + errorParam);
+    return;
+  }
 
-function handleToken(response) {
-  if (response.error) {
-    if (response.error !== 'interaction_required' && response.error !== 'access_denied') {
-      showStatus('Sign-in error: ' + response.error, 'error');
+  if (sessionParam) {
+    // Validate CSRF state
+    const savedState = sessionStorage.getItem('oauth_state');
+    sessionStorage.removeItem('oauth_state');
+    if (savedState && stateParam !== savedState) {
+      showAuthUI('Sign-in failed: state mismatch.');
+      return;
     }
-    showScreen('auth');
-    pendingUpload = false;
+    localStorage.setItem('session_id', sessionParam);
+  }
+
+  // Try to get an access token using the stored session
+  const sessionId = localStorage.getItem('session_id');
+  if (!sessionId) {
+    showAuthUI();
     return;
   }
 
-  accessToken = response.access_token;
-  tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
-
-  if (pendingUpload) {
-    pendingUpload = false;
-    _doUpload();
-  } else {
+  // Session exists — fetch a token (fast, ~200ms). Spinner shows meanwhile.
+  try {
+    await refreshAccessToken(sessionId);
+    renderFolderChips();
     showScreen('camera');
     startCamera();
+  } catch (err) {
+    if (err.message === 'session_not_found' || err.message === 'refresh_failed') {
+      localStorage.removeItem('session_id');
+    }
+    showAuthUI(err.message === 'session_not_found' ? '' : 'Session expired — please sign in again.');
   }
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+function showAuthUI(errorMsg) {
+  $('auth-loading').hidden = true;
+  $('auth-signin').hidden  = false;
+  if (errorMsg) showStatus(errorMsg, 'error');
+  showScreen('auth');
+}
+
+async function refreshAccessToken(sessionId) {
+  const res = await fetch(CONFIG.WORKER_URL + '/token', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ session_id: sessionId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'token_error');
+  accessToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+}
+
+// ─── Sign in ──────────────────────────────────────────────────────────────────
 function signIn() {
-  if (!tokenClient) {
-    showStatus('Config not loaded — check that config.js exists.', 'error');
-    return;
-  }
-  tokenClient.requestAccessToken({ prompt: 'select_account' });
+  const state = randomHex(16);
+  sessionStorage.setItem('oauth_state', state);
+
+  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id',     CONFIG.CLIENT_ID);
+  url.searchParams.set('redirect_uri',  CONFIG.WORKER_URL + '/callback');
+  url.searchParams.set('scope',         'https://www.googleapis.com/auth/drive.file');
+  url.searchParams.set('access_type',   'offline');
+  url.searchParams.set('prompt',        'consent');
+  url.searchParams.set('state',         state);
+
+  window.location.href = url.toString();
 }
 
 // ─── Folder picker ────────────────────────────────────────────────────────────
@@ -111,11 +152,7 @@ async function startCamera() {
   hideStatus();
   try {
     videoStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width:  { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false,
     });
     $('video').srcObject = videoStream;
@@ -126,23 +163,15 @@ async function startCamera() {
 }
 
 function stopCamera() {
-  if (videoStream) {
-    videoStream.getTracks().forEach(t => t.stop());
-    videoStream = null;
-  }
+  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
 }
 
 function capturePhoto() {
-  const video  = $('video');
-  const canvas = $('canvas');
-  if (!video.videoWidth) {
-    showStatus('Camera not ready yet — try again.', 'error');
-    return;
-  }
+  const video = $('video'), canvas = $('canvas');
+  if (!video.videoWidth) { showStatus('Camera not ready — try again.', 'error'); return; }
   canvas.width  = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-
   canvas.toBlob(blob => {
     if (!blob) { showStatus('Capture failed.', 'error'); return; }
     capturedBlob = blob;
@@ -153,13 +182,21 @@ function capturePhoto() {
 }
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
-function uploadToDrive() {
+async function uploadToDrive() {
   if (!capturedBlob) return;
 
+  // Silently refresh token if expired — no user action needed
   if (!accessToken || Date.now() >= tokenExpiry) {
-    pendingUpload = true;
-    tokenClient.requestAccessToken({ prompt: '' });
-    return;
+    const sessionId = localStorage.getItem('session_id');
+    if (!sessionId) { showScreen('auth'); return; }
+    try {
+      await refreshAccessToken(sessionId);
+    } catch {
+      localStorage.removeItem('session_id');
+      showScreen('auth');
+      showStatus('Session expired — please sign in again.', 'error');
+      return;
+    }
   }
 
   _doUpload();
@@ -178,7 +215,7 @@ async function _doUpload() {
 
   try {
     const res = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
       { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken }, body }
     );
     const data = await res.json();
@@ -187,7 +224,6 @@ async function _doUpload() {
     $('success-filename').textContent = data.name;
     $('success-folder').textContent   = folder.name;
     showScreen('success');
-
     URL.revokeObjectURL($('preview').src);
     capturedBlob = null;
 
@@ -209,7 +245,6 @@ function showScreen(name) {
 }
 
 let _statusTimer = null;
-
 function showStatus(msg, type) {
   const el = $('status');
   el.textContent = msg;
@@ -218,11 +253,7 @@ function showStatus(msg, type) {
   clearTimeout(_statusTimer);
   if (type !== 'error') _statusTimer = setTimeout(hideStatus, 4000);
 }
-
-function hideStatus() {
-  clearTimeout(_statusTimer);
-  $('status').hidden = true;
-}
+function hideStatus() { clearTimeout(_statusTimer); $('status').hidden = true; }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function buildFilename(folderName) {
@@ -235,4 +266,10 @@ function formatTimestamp(d) {
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
        + `_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+}
+
+function randomHex(bytes) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
 }

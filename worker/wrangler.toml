@@ -1,0 +1,19 @@
+name            = "bill-capture"
+main            = "index.js"
+compatibility_date = "2025-01-01"
+
+# KV namespace — run: wrangler kv namespace create SESSIONS
+# then paste the returned id below
+[[kv_namespaces]]
+binding = "SESSIONS"
+id      = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# Plain env vars (not secret)
+# Set PWA_URL to your GitHub Pages URL
+[vars]
+PWA_URL = "https://YOUR_GITHUB_USERNAME.github.io/receipt-scanner-app/"
+
+# Secrets — set these with:
+#   wrangler secret put GOOGLE_CLIENT_ID
+#   wrangler secret put GOOGLE_CLIENT_SECRET
+# (never put secrets in this file)

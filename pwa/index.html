@@ -341,6 +341,42 @@
 
     @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
 
+    /* ── Folder Chips ──────────────────────────────────────── */
+    .folder-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 0 16px;
+    }
+
+    .chip {
+      padding: 8px 18px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 2px solid rgba(255,255,255,0.55);
+      background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      min-height: 38px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    }
+    .chip.active {
+      background: #fff;
+      border-color: #fff;
+      color: var(--blue);
+    }
+    .chip:active { transform: scale(0.94); }
+
+    /* chips on preview screen sit on a dark bar, not over video */
+    .preview-chips-wrap {
+      background: #111;
+      padding: 14px 20px 4px;
+    }
+
     /* ── Misc ──────────────────────────────────────────────── */
     canvas { display: none; }
   </style>
@@ -387,6 +423,8 @@
     <canvas id="canvas"></canvas>
     <div class="camera-overlay">
       <div class="viewfinder-guide"><div class="vf-br"></div></div>
+      <!-- Folder chips — populated by renderFolderChips() -->
+      <div class="folder-chips" style="margin-bottom:18px;"></div>
       <button id="capture-btn" onclick="capturePhoto()" aria-label="Capture photo"></button>
     </div>
   </section>
@@ -395,6 +433,10 @@
   <section id="screen-preview" class="screen">
     <div class="preview-wrap">
       <img id="preview" alt="Captured bill">
+    </div>
+    <!-- Folder chips shown again so user can change destination before uploading -->
+    <div class="preview-chips-wrap">
+      <div class="folder-chips"></div>
     </div>
     <div class="preview-actions">
       <button class="btn btn-secondary" onclick="retake()">Retake</button>
@@ -417,6 +459,7 @@
     </div>
     <h2>Uploaded!</h2>
     <p id="success-filename"></p>
+    <p style="font-size:13px;color:var(--text-2);">→ <strong id="success-folder"></strong></p>
     <a id="success-link" target="_blank" rel="noopener">View in Google Drive →</a>
     <div class="success-actions">
       <button class="btn btn-primary" onclick="captureAnother()">Capture Another</button>

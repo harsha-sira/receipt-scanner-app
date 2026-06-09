@@ -2,7 +2,7 @@
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 // Values come from config.js (gitignored). See config.example.js for the template.
-const CONFIG = window.BILL_CONFIG || { CLIENT_ID: '', FOLDER_ID: '' };
+const CONFIG = window.BILL_CONFIG || { CLIENT_ID: '', FOLDERS: [] };
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let tokenClient   = null;
@@ -11,6 +11,12 @@ let tokenExpiry   = 0;
 let videoStream   = null;
 let capturedBlob  = null;
 let pendingUpload = false;
+
+// Persist the last-used folder index across sessions
+let selectedFolderIdx = Math.min(
+  parseInt(localStorage.getItem('lastFolder') || '0', 10),
+  Math.max(0, (CONFIG.FOLDERS?.length || 1) - 1)
+);
 
 // ─── DOM helpers ──────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -30,28 +36,27 @@ if ('serviceWorker' in navigator) {
 
 // ─── GIS initialisation ───────────────────────────────────────────────────────
 function onGISLoad() {
-  if (!CONFIG.CLIENT_ID) {
+  if (!CONFIG.CLIENT_ID || !CONFIG.FOLDERS?.length) {
     showStatus('Copy config.example.js → config.js and fill in your credentials.', 'error');
     return;
   }
+
+  renderFolderChips();
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: handleToken,
-    // error_callback fires when silent auth fails (e.g. first-ever use)
-    error_callback: () => { /* silent — sign-in button is already shown */ },
+    error_callback: () => { /* silent — sign-in button stays visible */ },
   });
 
-  // Attempt a silent (no-popup) token refresh on every page load.
-  // If the user has signed in before in this browser, the camera opens
-  // automatically with no interaction needed.
+  // Attempt a silent (no-popup) token refresh on every load.
+  // Succeeds when the user has already signed in before in this browser.
   tokenClient.requestAccessToken({ prompt: '' });
 }
 
 function handleToken(response) {
   if (response.error) {
-    // silent refresh failed — just leave the sign-in button visible
     if (response.error !== 'interaction_required' && response.error !== 'access_denied') {
       showStatus('Sign-in error: ' + response.error, 'error');
     }
@@ -60,8 +65,8 @@ function handleToken(response) {
     return;
   }
 
-  accessToken  = response.access_token;
-  tokenExpiry  = Date.now() + (response.expires_in - 60) * 1000;
+  accessToken = response.access_token;
+  tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
 
   if (pendingUpload) {
     pendingUpload = false;
@@ -78,9 +83,33 @@ function signIn() {
     showStatus('Config not loaded — check that config.js exists.', 'error');
     return;
   }
-  // 'consent' shows the Google picker + consent screen the first time.
-  // After that first approval Google won't ask again for the same scope.
   tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+// ─── Folder picker ────────────────────────────────────────────────────────────
+function renderFolderChips() {
+  // Renders chips into every .folder-chips container (camera screen + preview screen)
+  document.querySelectorAll('.folder-chips').forEach(container => {
+    container.innerHTML = '';
+    CONFIG.FOLDERS.forEach((folder, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'chip' + (idx === selectedFolderIdx ? ' active' : '');
+      btn.textContent = folder.name;
+      btn.setAttribute('aria-pressed', idx === selectedFolderIdx);
+      btn.onclick = () => selectFolder(idx);
+      container.appendChild(btn);
+    });
+  });
+}
+
+function selectFolder(idx) {
+  selectedFolderIdx = idx;
+  localStorage.setItem('lastFolder', idx);
+  // Keep all chip sets in sync (camera + preview both have chips)
+  document.querySelectorAll('.folder-chips .chip').forEach((chip, i) => {
+    chip.classList.toggle('active', i === idx);
+    chip.setAttribute('aria-pressed', i === idx);
+  });
 }
 
 // ─── Camera ───────────────────────────────────────────────────────────────────
@@ -134,7 +163,6 @@ function uploadToDrive() {
   if (!capturedBlob) return;
 
   if (!accessToken || Date.now() >= tokenExpiry) {
-    // Token expired — refresh silently (no popup expected since user already consented)
     pendingUpload = true;
     tokenClient.requestAccessToken({ prompt: '' });
     return;
@@ -146,8 +174,10 @@ function uploadToDrive() {
 async function _doUpload() {
   showScreen('uploading');
 
-  const filename = 'bill_' + formatTimestamp(new Date()) + '.jpg';
-  const metadata = { name: filename, mimeType: 'image/jpeg', parents: [CONFIG.FOLDER_ID] };
+  const folder   = CONFIG.FOLDERS[selectedFolderIdx];
+  const filename = buildFilename(folder.name);
+
+  const metadata = { name: filename, mimeType: 'image/jpeg', parents: [folder.id] };
 
   const body = new FormData();
   body.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -162,6 +192,7 @@ async function _doUpload() {
     if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
 
     $('success-filename').textContent = data.name;
+    $('success-folder').textContent   = folder.name;
     const link = $('success-link');
     link.href   = data.webViewLink || '#';
     link.hidden = !data.webViewLink;
@@ -204,6 +235,18 @@ function hideStatus() {
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
+function buildFilename(folderName) {
+  // Format: groceries_2024-03-15_14-30-05_a3f2.jpg
+  // Google Drive does NOT error on duplicate names — it creates a second file
+  // with the same name but a different unique ID. The timestamp (to the second)
+  // makes collisions extremely unlikely; the 4-char hex suffix makes them
+  // essentially impossible even if two photos are taken in the same second.
+  const slug   = folderName.toLowerCase().replace(/\s+/g, '-');
+  const ts     = formatTimestamp(new Date());
+  const suffix = Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0');
+  return `${slug}_${ts}_${suffix}.jpg`;
+}
+
 function formatTimestamp(d) {
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`

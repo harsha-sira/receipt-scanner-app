@@ -79,7 +79,7 @@ function signIn() {
     showStatus('Config not loaded — check that config.js exists.', 'error');
     return;
   }
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
 // ─── Folder picker ────────────────────────────────────────────────────────────
@@ -186,9 +186,6 @@ async function _doUpload() {
 
     $('success-filename').textContent = data.name;
     $('success-folder').textContent   = folder.name;
-    const link = $('success-link');
-    link.href   = data.webViewLink || '#';
-    link.hidden = !data.webViewLink;
     showScreen('success');
 
     URL.revokeObjectURL($('preview').src);

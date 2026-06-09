@@ -1,151 +1,187 @@
 # Bill Capture PWA — Setup Guide
 
-A 5-step guide to wire up Google OAuth and deploy the PWA.
+Complete setup from zero to installed on your iPhone.
 
 ---
 
-## What you need before starting
+## Part A — Google Cloud (one-time, ~15 minutes)
 
-- A Google account
-- The URL where you'll host the app (or `http://localhost:8080` for local testing)
+### A1 — Get your five Drive folder IDs
 
----
+For each category, open the folder in Google Drive and copy the ID from the URL:
 
-## Step 1 — Get your Google Drive folder ID
+```
+https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                        this is the folder ID
+```
 
-1. Open [Google Drive](https://drive.google.com) in a browser.
-2. Navigate to (or create) the folder where bills should land.
-3. Look at the URL — the folder ID is the string after the last `/`:
-   ```
-   https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                           this is your FOLDER_ID
-   ```
-4. Copy and save it.
+Create a note with all five:
 
----
-
-## Step 2 — Create a Google Cloud project
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com/).
-2. Click the **project picker** (top-left, next to "Google Cloud") → **New Project**.
-3. Name it (e.g. `Bill Capture PWA`) and click **Create**.
-4. Make sure the new project is selected in the picker before continuing.
+| Category | Folder ID |
+|---|---|
+| Personal (Harsha) | |
+| Personal Hesh | |
+| Coblera | |
+| Moxilo | |
+| Other | |
 
 ---
 
-## Step 3 — Enable the Google Drive API
+### A2 — Create a Google Cloud project
 
-1. In the Cloud Console, open **APIs & Services → Library**.
-2. Search for **Google Drive API**.
-3. Click the result and press **Enable**.
+1. Go to [console.cloud.google.com](https://console.cloud.google.com/)
+2. Click the project picker (top-left) → **New Project**
+3. Name it `Bill Capture` → **Create**
+4. Make sure the new project is selected before continuing
 
 ---
 
-## Step 4 — Create OAuth 2.0 credentials
+### A3 — Enable the Google Drive API
 
-### 4a — Configure the consent screen (one-time)
+1. Go to **APIs & Services → Library**
+2. Search **Google Drive API** → click it → **Enable**
 
-1. Go to **APIs & Services → OAuth consent screen**.
-2. Choose **External** and click **Create**.
+---
+
+### A4 — Configure the OAuth consent screen
+
+1. Go to **APIs & Services → OAuth consent screen**
+2. Choose **External** → **Create**
 3. Fill in:
-   - **App name**: Bill Capture
-   - **User support email**: your email
-   - **Developer contact email**: your email
-4. Click **Save and Continue**.
-5. On the **Scopes** step, click **Add or Remove Scopes**, search for  
-   `https://www.googleapis.com/auth/drive.file`, tick it, and click **Update**.
-6. Click **Save and Continue**.
-7. On the **Test users** step, click **Add Users** and add your Google email.
-8. Click **Save and Continue**, then **Back to Dashboard**.
+   - App name: `Bill Capture`
+   - User support email: your email
+   - Developer contact email: your email
+4. **Save and Continue**
+5. On the Scopes step → **Add or Remove Scopes** → search for `drive.file` → tick `https://www.googleapis.com/auth/drive.file` → **Update**
+6. **Save and Continue**
+7. On Test Users → **Add Users** → add your Google email
+8. **Save and Continue** → **Back to Dashboard**
 
-### 4b — Create the OAuth client
-
-1. Go to **APIs & Services → Credentials**.
-2. Click **Create Credentials → OAuth client ID**.
-3. Set **Application type** to **Web application**.
-4. Name it `Bill Capture PWA`.
-5. Under **Authorised JavaScript origins**, click **Add URI** and enter your app's URL:
-   - For local testing: `http://localhost:8080`
-   - For production: `https://yourdomain.com`
-   > Add both if you want to test locally and deploy.
-6. Leave **Authorised redirect URIs** empty (not needed for this flow).
-7. Click **Create**.
-8. A popup shows your **Client ID** — copy it (looks like `123456789-abc…xyz.apps.googleusercontent.com`).
+> Leave Publishing status as **Testing**. This means only you can sign in — no one else can use the app even if they find the URL.
 
 ---
 
-## Step 5 — Configure the app
+### A5 — Create OAuth credentials
 
-Open `pwa/app.js` and update the `CONFIG` block at the top of the file:
+1. Go to **APIs & Services → Credentials**
+2. **Create Credentials → OAuth client ID**
+3. Application type: **Web application**
+4. Name: `Bill Capture PWA`
+5. Under **Authorised JavaScript origins** → **Add URI**:
+   - `https://YOUR-GITHUB-USERNAME.github.io` (for production)
+   - `http://localhost:8080` (for local testing, optional)
+6. **Create**
+7. Copy the **Client ID** (looks like `123456789-abc.apps.googleusercontent.com`)
 
-```js
-const CONFIG = {
-  CLIENT_ID: '123456789-abc...xyz.apps.googleusercontent.com',  // ← from Step 4
-  FOLDER_ID: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs',             // ← from Step 1
-};
+---
+
+## Part B — Configure the app
+
+### Local use (running on your own machine)
+
+1. In the repo, copy the template:
+   ```bash
+   cp pwa/config.example.js pwa/config.js
+   ```
+2. Open `pwa/config.js` and fill in your values:
+   ```js
+   window.BILL_CONFIG = {
+     CLIENT_ID: '123456789-abc.apps.googleusercontent.com',
+     FOLDERS: [
+       { name: 'Personal (Harsha)', id: 'your-folder-id-1' },
+       { name: 'Personal Hesh',     id: 'your-folder-id-2' },
+       { name: 'Coblera',           id: 'your-folder-id-3' },
+       { name: 'Moxilo',            id: 'your-folder-id-4' },
+       { name: 'Other',             id: 'your-folder-id-5' },
+     ],
+   };
+   ```
+3. `config.js` is gitignored — it will never be committed.
+
+---
+
+## Part C — Deploy to GitHub Pages
+
+### C1 — Add secrets to GitHub
+
+Go to your GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**
+
+Add these secrets one by one:
+
+| Secret name | Value |
+|---|---|
+| `GOOGLE_CLIENT_ID` | your OAuth Client ID |
+| `FOLDER_ID_PERSONAL_HARSHA` | Drive folder ID for Personal (Harsha) |
+| `FOLDER_ID_PERSONAL_HESH` | Drive folder ID for Personal Hesh |
+| `FOLDER_ID_COBLERA` | Drive folder ID for Coblera |
+| `FOLDER_ID_MOXILO` | Drive folder ID for Moxilo |
+| `FOLDER_ID_OTHER` | Drive folder ID for Other |
+
+### C2 — Enable GitHub Pages
+
+1. Go to repo → **Settings → Pages**
+2. Under **Source**, select **GitHub Actions**
+3. Save
+
+### C3 — Trigger the first deploy
+
+Push any change to `main` that touches the `pwa/` folder, or re-run the workflow manually:
+
+1. Go to repo → **Actions → Deploy PWA to GitHub Pages**
+2. Click **Run workflow** → **Run workflow**
+
+Your app will be live at:
+```
+https://YOUR-GITHUB-USERNAME.github.io/receipt-scanner-app/
 ```
 
-Save the file.
+---
+
+## Part D — Install on iPhone
+
+1. Open the live URL in **Safari** (must be Safari — Chrome on iOS can't install PWAs)
+2. Tap the **Share button** (square with arrow pointing up, bottom of screen)
+3. Scroll down → tap **Add to Home Screen**
+4. Confirm the name → tap **Add**
+
+The Bill Capture icon appears on your home screen. It opens fullscreen like a native app.
 
 ---
 
-## Step 6 — Serve the app
+## Part E — Using the app
 
-The `pwa/` directory is a self-contained static site. Serve it from any HTTP server.
+1. **Tap the icon** on your home screen
+2. First time: tap **Sign in with Google** → pick your account → tap **Allow**
+3. From then on the camera opens automatically (no sign-in needed)
+4. **Pick a category** using the chips above the capture button
+5. **Tap the white circle** to capture the bill
+6. On the preview, you can change the category or tap **Retake**
+7. Tap **Upload to Drive** — done
 
-### Local testing
-
-```bash
-# Option A — Node (npx, no install needed)
-npx serve pwa/
-
-# Option B — Python
-python3 -m http.server 8080 --directory pwa/
-```
-
-Open `http://localhost:8080` in your browser.
-
-### Production deployment options
-
-| Host | Command / method |
-|------|-----------------|
-| **GitHub Pages** | Push repo → Settings → Pages → deploy from `main`, set source to `/pwa` folder |
-| **Netlify** | Drag-and-drop the `pwa/` folder at [netlify.com/drop](https://www.netlify.com/drop) |
-| **Vercel** | `cd pwa && npx vercel` |
-| **Any web server** | Copy `pwa/` contents to the document root |
-
-> **HTTPS is required** for camera access in production. All the hosts above provide it automatically. `localhost` is exempt.
+Files are named: `personal-harsha_2024-03-15_14-30-05_a3f2.jpg`
 
 ---
 
-## Step 7 — Install on iPhone / iPad
+## Removing Vercel (if it was connected)
 
-1. Open the app URL in **Safari** (not Chrome — iOS only supports PWA install from Safari).
-2. Tap the **Share button** (square with an arrow pointing up).
-3. Scroll down the share sheet and tap **Add to Home Screen**.
-4. Confirm the name and tap **Add**.
+If the repo was previously connected to Vercel:
 
-The icon appears on your home screen. Tap it — the app opens without any browser chrome, exactly like a native app.
+1. Go to [vercel.com/dashboard](https://vercel.com/dashboard)
+2. Find the project → **Settings → General** → scroll to bottom → **Delete Project**
+3. In the repo, check for and delete any `vercel.json` file (there is none in this repo)
+4. In `.gitignore`, the `.vercel` line can stay — it's harmless
 
 ---
 
 ## Troubleshooting
 
 | Symptom | Fix |
-|---------|-----|
-| **"This app isn't verified"** warning on sign-in | Expected during development. Click **Advanced → Go to Bill Capture (unsafe)**. Disappears after Google verifies your app (optional for personal use). |
-| Camera doesn't start | Ensure you're on HTTPS. On iOS go to **Settings → Safari → Camera** and allow access. |
-| `invalid_client` error | Double-check `CLIENT_ID` in `app.js` and confirm your URL is in **Authorised JavaScript origins**. |
-| Upload returns 403 | Confirm `FOLDER_ID` is correct and you're signed in as a test user on the consent screen. |
-| Token expired mid-session | Access tokens last 1 hour. Tap **Sign in with Google** again — re-auth is instant (no consent prompt) if you've already approved. |
-| "Add to Home Screen" missing | Must use Safari on iOS. In Chrome on iOS the option is not available. |
-
----
-
-## How the upload works (brief)
-
-1. **OAuth** — Google Identity Services (GIS) runs an implicit grant flow entirely in the browser. No server, no refresh token storage.
-2. **Capture** — `getUserMedia` streams the rear camera into a `<video>` element. A tap draws the current frame onto a hidden `<canvas>` and extracts a JPEG `Blob`.
-3. **Upload** — A single `multipart/form-data` POST to `https://www.googleapis.com/upload/drive/v3/files` attaches both the file metadata (name, parent folder) and the JPEG blob. The file lands in your Drive folder instantly.
-4. **No camera roll** — The JPEG never touches the device's photo library; it exists only in memory until uploaded.
+|---|---|
+| "Access blocked: you're not a test user" | Add your email under OAuth consent screen → Test Users |
+| "This app isn't verified" warning | Click **Advanced → Go to Bill Capture (unsafe)** — expected during testing |
+| Camera doesn't start | Must be HTTPS. On iOS: Settings → Safari → Camera → Allow |
+| `invalid_client` error | Check CLIENT_ID in config.js and confirm your domain is in Authorised JavaScript origins |
+| Upload returns 403 | Check the folder ID is correct and you're signed in as a test user |
+| Sign-in button shows every time | Normal on first use. After that it signs in silently. If it keeps showing, your Google session may have expired — one tap fixes it |
+| "Add to Home Screen" not visible | Must use Safari. Not available in Chrome/Firefox on iOS |

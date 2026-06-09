@@ -1,36 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bill Capture PWA
 
-## Getting Started
+A mobile Progressive Web App that photographs bills and uploads them directly to Google Drive — no camera roll, no App Store.
 
-First, run the development server:
+## Quick start
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Read **SETUP.md** for the one-time Google Cloud / OAuth setup.
+2. Copy `pwa/config.example.js` → `pwa/config.js` and fill in your credentials.
+3. Serve the `pwa/` folder over HTTPS and open it in Safari on iOS.
+4. Tap **Share → Add to Home Screen** to install.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Categories
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Label | Drive folder |
+|---|---|
+| Personal (Harsha) | your folder ID |
+| Personal Hesh | your folder ID |
+| Coblera | your folder ID |
+| Moxilo | your folder ID |
+| Other | your folder ID |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment
 
-## Learn More
+Deployed automatically to **GitHub Pages** via `.github/workflows/deploy-pwa.yml` on every push to `main`. Credentials are stored as GitHub repository secrets — never in the code.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See SETUP.md for full setup and deployment instructions.

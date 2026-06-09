@@ -29,13 +29,13 @@ jobs:
         run: |
           cat > pwa/config.js << 'EOF'
           window.BILL_CONFIG = {
-            CLIENT_ID:       "${{ secrets.GOOGLE_CLIENT_ID }}",
-            GEMINI_API_KEY:  "${{ secrets.GEMINI_API_KEY }}",
+            CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID }}",
             FOLDERS: [
-              { name: "Groceries", id: "${{ secrets.FOLDER_ID_GROCERIES }}" },
-              { name: "Utilities", id: "${{ secrets.FOLDER_ID_UTILITIES }}" },
-              { name: "Medical",   id: "${{ secrets.FOLDER_ID_MEDICAL }}"   },
-              { name: "Other",     id: "${{ secrets.FOLDER_ID_OTHER }}"     },
+              { name: "Personal (Harsha)", id: "${{ secrets.FOLDER_ID_PERSONAL_HARSHA }}" },
+              { name: "Personal Hesh",     id: "${{ secrets.FOLDER_ID_PERSONAL_HESH }}"   },
+              { name: "Coblera",           id: "${{ secrets.FOLDER_ID_COBLERA }}"          },
+              { name: "Moxilo",            id: "${{ secrets.FOLDER_ID_MOXILO }}"           },
+              { name: "Other",             id: "${{ secrets.FOLDER_ID_OTHER }}"            },
             ],
           };
           EOF
